@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio,line-clamp"></script>
+    <script>
+        tailwind.config = {
+            prefix: 'tw-',
+        }
+    </script>
+    <title>MakDee</title>
+</head>
+
+<body>
+    <div id="app">
+        <v-app>
+            <v-container>
+                <div class="tw-flex tw-flex-row tw-min-h-screen">
+                    <div class="tw-flex tw-flex-col tw-gap-y-4 tw-grow">
+                        <div
+                            class="tw-flex tw-flex-row tw-gap-x-2 tw-justify-center tw-items-center tw-text-xl tw-font-bold">
+                            <div>
+                                Number of Bots : {{ bots.length }}
+                            </div>
+                            <div>
+                                Available Bots : {{ availableBots.length }}
+                            </div>
+                        </div>
+                        <div class="tw-grid tw-grid-cols-2 tw-divide-x">
+                            <div class="tw-flex tw-flex-col tw-items-center tw-gap-y-2">
+                                <div class="tw-text-lg tw-font-bold">Pending Orders</div>
+                                <div class="tw-font-bold tw-text-lg" v-for="(item, idx) in pendingOrders" :key="idx">
+                                    {{ item.id}}
+                                </div>
+                            </div>
+                            <div class="tw-flex tw-flex-col tw-items-center tw-gap-y-2">
+                                <div class="tw-text-lg tw-font-bold">Completed Orders</div>
+                                <div class="tw-font-bold tw-text-lg" v-for="(item, idx) in completedOrders" :key="idx">
+                                    {{ item.id}}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tw-flex tw-flex-col tw-gap-y-2">
+                        <v-btn @click="addNormalOrder">Add Normal Order</v-btn>
+                        <v-btn @click="addVIPOrder">Add VIP Order</v-btn>
+                        <v-divider></v-divider>
+                        <v-btn @click="addBot">+ Bot</v-btn>
+                        <v-btn @click="removeBot">- Bot</v-btn>
+                    </div>
+                </div>
+            </v-container>
+        </v-app>
+    </div>
+</body>
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<script src="
+https://cdn.jsdelivr.net/npm/vuetify@3.3.5/dist/vuetify.min.js
+"></script>
+<link href="
+https://cdn.jsdelivr.net/npm/vuetify@3.3.5/dist/vuetify.min.css
+" rel="stylesheet">
+<script>
+    const { createApp, reactive, computed, ref, watch } = Vue
+    const { createVuetify } = Vuetify
+
+    const vuetify = createVuetify()
+    createApp({
+        setup() {
+            const bots = reactive([])
+            const normalOrders = reactive([])
+            const vipOrders = reactive([])
+            const orderIds = ref(1)
+            const botIds = ref(1)
+
+            const orderMasterlist = computed(() => {
+                return [...vipOrders, ...normalOrders];
+            })
+
+            const pendingOrders = computed(() => {
+                return orderMasterlist.value.filter(i => !i.isComplete)
+            })
+
+            const completedOrders = computed(() => {
+                return orderMasterlist.value.filter(i => i.isComplete && i.botId === '')
+            })
+
+            const availableBots = computed(() => {
+                return bots.filter(i => i.isAvailable)
+            })
+
+            const addBot = () => {
+                bots.push(reactive({
+                    id: `${botIds.value}_${Date.now()}`,
+                    isAvailable: true,
+                }))
+                botIds.value++;
+            }
+
+            const removeBot = () => {
+                bots.pop()
+            }
+
+            const addNormalOrder = () => {
+                normalOrders.push(reactive({
+                    id: orderIds.value,
+                    isComplete: false,
+                    isVip: false,
+                    botId: ''
+                }))
+                orderIds.value++;
+            }
+
+            const addVIPOrder = () => {
+                vipOrders.push(reactive({
+                    id: orderIds.value,
+                    isComplete: false,
+                    isVip: true,
+                    botId: '',
+                }))
+                orderIds.value++;
+            }
+
+            watch(bots, (newVal, oldVal) => {
+                processOrderWorkflow()
+            })
+
+            watch(pendingOrders, (newVal, oldVal) => {
+                processOrderWorkflow()
+            })
+
+            const processOrderWorkflow = () => {
+                if (availableBots.value.length > 0) {
+                    availableBots.value.forEach((bot) => {
+                        if (pendingOrders.value.length > 0) {
+                            pendingOrders.value.forEach((order) => {
+                                if (order.botId === '' && bot.isAvailable) {
+                                    toggleOrderToBot(order, bot.id)
+                                    toggleBotAvailability(bot, false)
+                                    processOrder(bot, order)
+                                }
+                            })
+                        } else console.log('No pending orders');
+                    })
+                } else console.log('No available bots');
+            }
+
+            const processOrder = (bot, order) => {
+                console.log('Processing Order: ', order);
+                setTimeout(() => {
+                    order.isComplete = true
+                    toggleOrderToBot(order, '')
+                    toggleBotAvailability(bot, true)
+                }, 10000)
+            }
+
+            const toggleBotAvailability = (bot, isAvailable) => {
+                bot.isAvailable = isAvailable
+                const idx = bots.findIndex(i => i.id === bot.id)
+                bots.splice(idx, 1, bot)
+            }
+
+            const toggleOrderToBot = (order, id) => {
+                order.botId = id
+                if (order.isVip) {
+                    const idx = vipOrders.findIndex(i => i.id === order.id)
+                    vipOrders.splice(idx, 1, order)
+                } else {
+                    const idx = normalOrders.findIndex(i => i.id === order.id)
+                    normalOrders.splice(idx, 1, order)
+                }
+            }
+
+            return {
+                bots,
+                normalOrders,
+                vipOrders,
+                orderIds,
+                botIds,
+
+                pendingOrders,
+                completedOrders,
+                availableBots,
+
+                addBot,
+                removeBot,
+                addNormalOrder,
+                addVIPOrder,
+            }
+        }
+    })
+        .use(vuetify)
+        .mount('#app')
+</script>
+
+</html>
